@@ -12,7 +12,9 @@ import { RedisService } from '../redis/redis.service';
 
 @WebSocketGateway({
   namespace: '/chat',
-  cors: true
+   cors: {
+    origin: '*',
+  },
 })
 export class ChatGateway
   implements OnGatewayConnection, OnGatewayInit, OnGatewayDisconnect
@@ -88,35 +90,58 @@ export class ChatGateway
   }
 
   // ✅ REDIS SUBSCRIBER
+  // async afterInit() {
+  //   const sub = this.redis.client.duplicate();
+
+  //   // ⚠️ important
+  //   await sub.connect();
+
+  //   await sub.psubscribe('room:*:messages');
+  //   await sub.psubscribe('room:*:events');
+
+  //   sub.on('pmessage', (pattern: string, channel: string, msg: string) => {
+  //     try {
+  //       const data = JSON.parse(msg);
+
+  //       if (channel.includes(':messages')) {
+  //         this.server.to(data.roomId).emit('message:new', data);
+  //       }
+
+  //       if (channel.includes(':events') && data.type === 'room:deleted') {
+  //         this.server.to(data.roomId).emit('room:deleted', {
+  //           roomId: data.roomId
+  //         });
+  //       }
+  //     } catch (err) {
+  //       console.error('❌ Redis message error:', err);
+  //     }
+  //   });
+
+  //   console.log('✅ Redis subscriber ready');
+  // }
   async afterInit() {
-    const sub = this.redis.client.duplicate();
+  console.log("🔥 ChatGateway initialized");
 
-    // ⚠️ important
-    await sub.connect();
+  const sub = this.redis.client.duplicate();
 
-    await sub.psubscribe('room:*:messages');
-    await sub.psubscribe('room:*:events');
+  // ❌ DO NOT call connect()
 
-    sub.on('pmessage', (pattern: string, channel: string, msg: string) => {
-      try {
-        const data = JSON.parse(msg);
+  await sub.psubscribe('room:*:messages', 'room:*:events');
 
-        if (channel.includes(':messages')) {
-          this.server.to(data.roomId).emit('message:new', data);
-        }
+  sub.on('pmessage', (pattern, channel, msg) => {
+    const data = JSON.parse(msg);
 
-        if (channel.includes(':events') && data.type === 'room:deleted') {
-          this.server.to(data.roomId).emit('room:deleted', {
-            roomId: data.roomId
-          });
-        }
-      } catch (err) {
-        console.error('❌ Redis message error:', err);
-      }
-    });
+    if (channel.includes(':messages')) {
+      this.server.to(data.roomId).emit('message:new', data);
+    }
 
-    console.log('✅ Redis subscriber ready');
-  }
+    if (channel.includes(':events') && data.type === 'room:deleted') {
+      this.server.to(data.roomId).emit('room:deleted', {
+        roomId: data.roomId
+      });
+    }
+  });
+}
 
   // ✅ CLIENT EVENT
   @SubscribeMessage('room:leave')

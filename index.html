@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat WS Tester</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+
+<body>
+  <h2>🧪 WebSocket Tester</h2>
+
+  <div>
+    <label>Token:</label><br />
+    <input id="token" style="width:400px" />
+  </div>
+
+  <div>
+    <label>Room ID:</label><br />
+    <input id="roomId" style="width:400px" />
+  </div>
+
+  <br />
+
+  <button onclick="connect()">Connect</button>
+  <button onclick="leave()">Leave</button>
+
+  <hr />
+
+  <div>
+    <input id="message" placeholder="Type message..." style="width:300px" />
+    <button onclick="sendMessage()">Send (REST)</button>
+  </div>
+
+  <hr />
+
+  <h3>📡 Logs</h3>
+  <pre id="logs"></pre>
+
+  <script>
+    let socket = null;
+
+    function log(msg) {
+      const logs = document.getElementById("logs");
+      logs.innerText += msg + "\n";
+    }
+
+    function connect() {
+      const token = document.getElementById("token").value;
+      const roomId = document.getElementById("roomId").value;
+
+      socket = io("http://localhost:3000/chat", {
+        query: { token, roomId }
+      });
+
+      socket.on("connect", () => {
+        log("✅ Connected: " + socket.id);
+      });
+
+      socket.on("room:joined", (data) => {
+        log("📥 room:joined → " + JSON.stringify(data));
+      });
+
+      socket.on("room:user_joined", (data) => {
+        log("👤 room:user_joined → " + JSON.stringify(data));
+      });
+
+      socket.on("room:user_left", (data) => {
+        log("👋 room:user_left → " + JSON.stringify(data));
+      });
+
+      socket.on("message:new", (data) => {
+        log("💬 message:new → " + JSON.stringify(data));
+      });
+
+      socket.on("room:deleted", (data) => {
+        log("❌ room:deleted → " + JSON.stringify(data));
+      });
+
+      socket.on("disconnect", () => {
+        log("🔌 Disconnected");
+      });
+    }
+
+    function leave() {
+      if (socket) {
+        socket.emit("room:leave");
+      }
+    }
+
+    async function sendMessage() {
+      const token = document.getElementById("token").value;
+      const roomId = document.getElementById("roomId").value;
+      const content = document.getElementById("message").value;
+
+      const res = await fetch(
+        `http://localhost:3000/api/v1/rooms/${roomId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          body: JSON.stringify({ content })
+        }
+      );
+
+      const data = await res.json();
+      log("📤 REST response → " + JSON.stringify(data));
+    }
+  </script>
+</body>
+</html>
